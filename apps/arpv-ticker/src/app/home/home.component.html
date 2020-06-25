@@ -1,0 +1,20 @@
+<h1>ARPV Ticker</h1>
+<div>
+  <button (click)="start()">Start</button>
+  <button (click)="stop()">Stop</button>
+</div>
+<div *ngIf="day">
+  <div
+    style="margin-top: 1rem; background-color: yellow; padding: 1rem"
+    *ngFor="let snapshot of day.DAILY_DATA_VECTOR; let i = index">
+      <div *ngIf="i == 0">
+        <p><strong>Day Open: </strong>{{day.DAILY_OPEN}}</p>
+        <p><strong>Day Low: </strong>{{day.DAILY_LOW}}</p>
+        <p><strong>Day High: </strong>{{day.DAILY_HIGH}}</p>
+        <p><strong>First Candle: </strong>[{{day.DAILY_DATA_VECTOR}}]</p>
+      </div>
+      <div *ngIf="i != 0">
+        [<span *ngFor="let item of snapshot">{{item}} ,</span>]
+      </div> 
+  </div>
+</div>

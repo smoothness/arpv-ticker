@@ -1,5 +1,5 @@
 {
-  "npmScope": "arpv-ticker",
+  "npmScope": "arpv",
   "implicitDependencies": {
     "angular.json": "*",
     "package.json": {
@@ -25,6 +25,12 @@
     "arpv-ticker-e2e": {
       "tags": [],
       "implicitDependencies": ["arpv-ticker"]
+    },
+    "core-data": {
+      "tags": []
+    },
+    "ui": {
+      "tags": []
     }
   }
 }
