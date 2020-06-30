@@ -1,4 +1,6 @@
 import { Component, OnInit } from '@angular/core';
+// modify this route / look at WR project
+import { IbAPIService } from '../../../../../libs/core-data/src/lib/IbAPI/ib-api.service';
 
 interface Candle {
   open:number;
@@ -25,11 +27,24 @@ interface Day {
 export class HomeComponent implements OnInit {
   // time unit is a second (1000 miliseconds)
   readonly TIME_UNIT:number = 1000;
-  readonly TIME_INTERVAL = 30;
-  day:Day;
-  running:boolean = true;
+  readonly TIME_INTERVAL = 5;
+  day: Day;
+  running: boolean = true;
+  high = null;
 
-  constructor() { }
+  constructor(private ibAPIService: IbAPIService) { }
+
+  // get teh high value of teh data feed
+  // the promise type should be a custom "High" type
+  getHigh() {
+    // AJAX connection to IB Rest API
+    return this.ibAPIService.high()
+      .subscribe((result: any) => this.high = result[0][31]);
+
+    // get mocked high value from random generator
+    // the below return is automatically wrapped in a promise by JS
+    // return Math.random() * 10;
+  }
 
   initDay(config:Day):void {
     this.day = {
@@ -48,16 +63,6 @@ export class HomeComponent implements OnInit {
     // return newDay;
   }
 
-  // get teh high value of teh data feed
-  // the promise type should be a custom "High" type
-  async getHigh():Promise<number> {
-    // get mocked high value from random generator
-    // the below return is automatically wrapped in a promise by JS
-    return Math.random() * 10;
-
-    // implement AJAX connection to IB Rest API
-  }
-
   // TODO: change number[] to Candle[] type
   getSnapshot(seconds:number):Promise<number[]> {
     return new Promise((resolve, reject) => {
@@ -66,9 +71,15 @@ export class HomeComponent implements OnInit {
 
       const interval = setInterval(async () => {
         if (counter < seconds) {
-          const val:number = await this.getHigh();
-          console.log('val', val)
-          first_candle.push(val);
+          await this.getHigh();
+
+          console.log('this->high', this.high);
+
+
+
+
+
+          first_candle.push(this.high);
           counter++;
         } else {
           clearInterval(interval);
@@ -89,14 +100,14 @@ export class HomeComponent implements OnInit {
       DAILY_HIGH: first_candle.sort()[first_candle.length - 1],
       DAILY_DATA_VECTOR: [first_candle]
     });
-    console.log('INIT DAY: ', this.day);
+    // console.log('INIT DAY: ', this.day);
   }
   
   async run() {
     while (this.running) {
       const snapshot = await this.getSnapshot(this.TIME_INTERVAL);
       this.day.DAILY_DATA_VECTOR.push(snapshot);
-      console.log('Snapshot: ', this.day);
+      // console.log('Snapshot: ', this.day);
     }
   }
 
