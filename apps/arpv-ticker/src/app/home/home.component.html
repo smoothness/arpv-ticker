@@ -8,13 +8,18 @@
     style="margin-top: 1rem; background-color: yellow; padding: 1rem"
     *ngFor="let snapshot of day.DAILY_DATA_VECTOR; let i = index">
       <div *ngIf="i == 0">
+        <h2 style="background-color: black; color: white; padding: 10px 20px">First Candle</h2>
         <p><strong>Day Open: </strong>{{day.DAILY_OPEN}}</p>
         <p><strong>Day Low: </strong>{{day.DAILY_LOW}}</p>
         <p><strong>Day High: </strong>{{day.DAILY_HIGH}}</p>
         <p><strong>First Candle: </strong>[{{day.DAILY_DATA_VECTOR}}]</p>
       </div>
       <div *ngIf="i != 0">
-        [<span *ngFor="let item of snapshot">{{item}} ,</span>]
+        <p><strong>Open:</strong> {{day.DAILY_DATA_VECTOR[i].open}}</p>
+        <p><strong>Low:</strong> {{day.DAILY_DATA_VECTOR[i].low}}</p>
+        <p><strong>High:</strong> {{day.DAILY_DATA_VECTOR[i].high}}</p>
+        <p><strong>Close:</strong> {{day.DAILY_DATA_VECTOR[i].close}}</p>
+        <p><strong>Candle:</strong> [{{day.DAILY_DATA_VECTOR[i].data}}]</p>
       </div> 
   </div>
 </div>

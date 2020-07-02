@@ -1,21 +1,24 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, COMPILER_OPTIONS } from '@angular/core';
+import * as R from "ramda";
+
 // modify this route / look at WR project
 import { IbAPIService } from '../../../../../libs/core-data/src/lib/IbAPI/ib-api.service';
 
 interface Candle {
-  open:number;
-  low:number;
-  high:number;
-  close:number;
-  data:number[];
+  open: number;
+  low: number;
+  high: number;
+  close: number;
+  data: number[];
 }
 
 interface Day {
-  DAILY_OPEN:number;
-  DAILY_LOW:number;
-  DAILY_HIGH:number;
-  DAILY_CLOSE?:number;
-  DAILY_DATA_VECTOR?:number[][];
+  DAILY_OPEN: number;
+  DAILY_LOW: number;
+  DAILY_HIGH: number;
+  DAILY_CLOSE?: number;
+  DAILY_DATA_VECTOR?: any;
+  // DAILY_DATA_VECTOR?:number[][];
 }
 
 @Component({
@@ -43,7 +46,7 @@ export class HomeComponent implements OnInit {
 
     // get mocked high value from random generator
     // the below return is automatically wrapped in a promise by JS
-    // return Math.random() * 10;
+    // this.high = Math.random() * 10;
   }
 
   initDay(config:Day):void {
@@ -66,7 +69,7 @@ export class HomeComponent implements OnInit {
   // TODO: change number[] to Candle[] type
   getSnapshot(seconds:number):Promise<number[]> {
     return new Promise((resolve, reject) => {
-      const first_candle:number[] = [];
+      const candle:number[] = [];
       let counter:number = 0; 
 
       const interval = setInterval(async () => {
@@ -75,15 +78,11 @@ export class HomeComponent implements OnInit {
 
           console.log('this->high', this.high);
 
-
-
-
-
-          first_candle.push(this.high);
+          candle.push(this.high);
           counter++;
         } else {
           clearInterval(interval);
-          resolve(first_candle);
+          resolve(candle);
         }
       }, this.TIME_UNIT);
     })
@@ -95,19 +94,27 @@ export class HomeComponent implements OnInit {
   async setDayGlobals():Promise<void> {
     const first_candle = await this.getSnapshot(this.TIME_INTERVAL);
     this.initDay({
-      DAILY_OPEN: first_candle[0],
-      DAILY_LOW: first_candle.sort()[0],
-      DAILY_HIGH: first_candle.sort()[first_candle.length - 1],
+      DAILY_OPEN: this.calcOpen(first_candle),
+      DAILY_LOW: this.calcLow(first_candle),
+      DAILY_HIGH: this.calcHigh(first_candle),
       DAILY_DATA_VECTOR: [first_candle]
     });
-    // console.log('INIT DAY: ', this.day);
   }
   
   async run() {
     while (this.running) {
       const snapshot = await this.getSnapshot(this.TIME_INTERVAL);
-      this.day.DAILY_DATA_VECTOR.push(snapshot);
-      // console.log('Snapshot: ', this.day);
+      const currCandleData = {
+        open: this.calcOpen(snapshot),
+        low: this.calcLow(snapshot),
+        high: this.calcHigh(snapshot),
+        close: this.calcClose(snapshot), 
+        data: [snapshot]
+      }
+      this.day.DAILY_DATA_VECTOR.push(currCandleData);
+     
+      if (currCandleData.close < this.day.DAILY_LOW) console.log("%c%s", "background:red; font-size: 30px; color: black; padding: 3px 12px", 'SELL!'); 
+      if (currCandleData.close > this.day.DAILY_HIGH) console.log("%c%s", "background:green; font-size: 30px; color: black; padding: 3px 12px;", 'BUY!');
     }
   }
 
@@ -121,6 +128,24 @@ export class HomeComponent implements OnInit {
   stop() {
     this.running = false;
     console.log('...stopping on last tick...');
+  }
+
+  calcOpen(list: number[]): number {
+    return R.head(list);
+  }
+
+  calcClose(list: number[]): number {
+    return R.last(list);
+  }
+
+  calcLow(list: number[]): number {
+    return R.head(R.sort((a: number, b:number) => a - b, list));
+    // return list.sort()[0];
+  }
+ 
+  calcHigh(list: number[]): number {
+    return R.last(R.sort((a: number, b:number) => a - b, list));
+    // return list.sort()[list.length - 1];
   }
 
   ngOnInit(): void {
