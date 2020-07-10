@@ -12,6 +12,7 @@
         <p><strong>Day Open: </strong>{{day.DAILY_OPEN}}</p>
         <p><strong>Day Low: </strong>{{day.DAILY_LOW}}</p>
         <p><strong>Day High: </strong>{{day.DAILY_HIGH}}</p>
+        <p><strong>Day Range: </strong>{{day.DAILY_RANGE}}</p>
         <p><strong>First Candle: </strong>[{{day.DAILY_DATA_VECTOR}}]</p>
       </div>
       <div *ngIf="i != 0">
@@ -19,7 +20,10 @@
         <p><strong>Low:</strong> {{day.DAILY_DATA_VECTOR[i].low}}</p>
         <p><strong>High:</strong> {{day.DAILY_DATA_VECTOR[i].high}}</p>
         <p><strong>Close:</strong> {{day.DAILY_DATA_VECTOR[i].close}}</p>
-        <p><strong>Candle:</strong> [{{day.DAILY_DATA_VECTOR[i].data}}]</p>
-      </div> 
+      </div>
+  </div>
+   
+  <div *ngIf="!this.running">
+    <p><strong>Day Close: </strong>{{day.DAILY_CLOSE}}</p>
   </div>
 </div>

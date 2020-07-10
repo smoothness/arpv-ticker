@@ -4,21 +4,21 @@ import * as R from "ramda";
 // modify this route / look at WR project
 import { IbAPIService } from '../../../../../libs/core-data/src/lib/IbAPI/ib-api.service';
 
-interface Candle {
-  open: number;
-  low: number;
-  high: number;
-  close: number;
-  data: number[];
-}
+// interface Candle {
+//   open: number;
+//   low: number;
+//   high: number;
+//   close: number;
+//   data: number[];
+// }
 
 interface Day {
   DAILY_OPEN: number;
   DAILY_LOW: number;
   DAILY_HIGH: number;
   DAILY_CLOSE?: number;
+  DAILY_RANGE: number;
   DAILY_DATA_VECTOR?: any;
-  // DAILY_DATA_VECTOR?:number[][];
 }
 
 @Component({
@@ -31,9 +31,14 @@ export class HomeComponent implements OnInit {
   // time unit is a second (1000 miliseconds)
   readonly TIME_UNIT:number = 1000;
   readonly TIME_INTERVAL = 5;
+  price: number;
   day: Day;
   running: boolean = true;
   high = null;
+  lastSnapshot: number[];
+  isOrderPlaced: boolean = false;
+  orderPrice: number;
+  orderType: string;
 
   constructor(private ibAPIService: IbAPIService) { }
 
@@ -41,12 +46,12 @@ export class HomeComponent implements OnInit {
   // the promise type should be a custom "High" type
   getHigh() {
     // AJAX connection to IB Rest API
-    return this.ibAPIService.high()
-      .subscribe((result: any) => this.high = result[0][31]);
-
+    // return this.ibAPIService.high()
+    //   .subscribe((result: any) => this.high = result[0][31]);
+    
     // get mocked high value from random generator
     // the below return is automatically wrapped in a promise by JS
-    // this.high = Math.random() * 10;
+    this.high = Math.random() * 10;
   }
 
   initDay(config:Day):void {
@@ -55,12 +60,14 @@ export class HomeComponent implements OnInit {
       DAILY_LOW: 0,
       DAILY_HIGH: 0,
       DAILY_CLOSE: 0,
+      DAILY_RANGE: 0,
       DAILY_DATA_VECTOR: [[0]]
     };
 
     if (config.DAILY_OPEN) this.day.DAILY_OPEN = config.DAILY_OPEN;
     if (config.DAILY_LOW) this.day.DAILY_LOW = config.DAILY_LOW;
     if (config.DAILY_HIGH) this.day.DAILY_HIGH = config.DAILY_HIGH;
+    if (config.DAILY_RANGE) this.day.DAILY_RANGE = config.DAILY_RANGE;
     if (config.DAILY_DATA_VECTOR) this.day.DAILY_DATA_VECTOR = config.DAILY_DATA_VECTOR;
 
     // return newDay;
@@ -97,6 +104,7 @@ export class HomeComponent implements OnInit {
       DAILY_OPEN: this.calcOpen(first_candle),
       DAILY_LOW: this.calcLow(first_candle),
       DAILY_HIGH: this.calcHigh(first_candle),
+      DAILY_RANGE: this.calcRange(this.calcHigh(first_candle), this.calcLow(first_candle)),
       DAILY_DATA_VECTOR: [first_candle]
     });
   }
@@ -104,6 +112,7 @@ export class HomeComponent implements OnInit {
   async run() {
     while (this.running) {
       const snapshot = await this.getSnapshot(this.TIME_INTERVAL);
+      this.lastSnapshot = snapshot;
       const currCandleData = {
         open: this.calcOpen(snapshot),
         low: this.calcLow(snapshot),
@@ -111,23 +120,76 @@ export class HomeComponent implements OnInit {
         close: this.calcClose(snapshot), 
         data: [snapshot]
       }
+
       this.day.DAILY_DATA_VECTOR.push(currCandleData);
-     
-      if (currCandleData.close < this.day.DAILY_LOW) console.log("%c%s", "background:red; font-size: 30px; color: black; padding: 3px 12px", 'SELL!'); 
-      if (currCandleData.close > this.day.DAILY_HIGH) console.log("%c%s", "background:green; font-size: 30px; color: black; padding: 3px 12px;", 'BUY!');
+
+      if (!this.isOrderPlaced) {
+        this.isOrderPlaced = true;
+  
+        if (currCandleData.close > this.day.DAILY_HIGH) {
+          this.orderType = 'buy';
+          this.marketOrder(this.high, 'buy', 'first');
+        }
+
+        if (currCandleData.close < this.day.DAILY_LOW) {
+          this.orderType = 'sell';
+          this.marketOrder(this.high, 'sell', 'first');
+        }
+      } else {
+        if (this.high >= (this.orderPrice + this.day.DAILY_RANGE) && this.orderType === 'buy') {
+          this.marketOrder(this.high, 'sell', 'recurrent');
+        }
+
+        if (this.high <= (this.orderPrice - this.day.DAILY_RANGE) && this.orderType === 'sell') {
+          this.marketOrder(this.high, 'buy', 'recurrent');
+        }
+      }
+    }
+  }
+
+  marketOrder(high:number, type: string, message: string) {
+    if (type === 'buy') {
+      if (message === 'first') {
+        this.orderPrice = high;
+        // execute buy order through API
+        console.log("%c%s", "background:green; font-size: 30px; color: black; padding: 3px 12px;", `${message} ${type}`);
+      } 
+      
+      if (message === 'recurrent') {
+        // execute buy order through API
+        console.log("%c%s", "background:green; font-size: 30px; color: black; padding: 3px 12px;", `${message} ${type}`);
+      } 
+    }
+
+    if (type === 'sell') {
+      if (message === 'first') {
+        this.orderPrice = high;
+        // execute sell order through API
+        console.log("%c%s", "background:green; font-size: 30px; color: black; padding: 3px 12px;", `${message} ${type}`);
+      } 
+      
+      if (message === 'recurrent') {
+        // execute sell order through API
+        console.log("%c%s", "background:green; font-size: 30px; color: black; padding: 3px 12px;", `${message} ${type}`);
+      } 
     }
   }
 
   async start() {
     console.log('...starting...');
     await this.setDayGlobals().catch(error => console.log(error.stack));
-    const lastCandle = this.run();
+    this.run();
     console.log('...running...');
   }
-
+  
   stop() {
     this.running = false;
     console.log('...stopping on last tick...');
+    // important*** the daily close will be the close value of the
+    // last COMPLETE candle before the stop button was cliked.
+    // (or the cronjob triggers the day close)
+    this.day.DAILY_CLOSE = R.last(this.lastSnapshot);
+    console.log('Day close: ', this.day.DAILY_CLOSE);
   }
 
   calcOpen(list: number[]): number {
@@ -146,6 +208,10 @@ export class HomeComponent implements OnInit {
   calcHigh(list: number[]): number {
     return R.last(R.sort((a: number, b:number) => a - b, list));
     // return list.sort()[list.length - 1];
+  }
+
+  calcRange(high: number, low: number): number {
+    return high - low; 
   }
 
   ngOnInit(): void {
