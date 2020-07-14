@@ -34,11 +34,12 @@ export class HomeComponent implements OnInit {
   price: number;
   day: Day;
   running: boolean = true;
-  high = null;
+  high: number;
   lastSnapshot: number[];
   isOrderPlaced: boolean = false;
   orderPrice: number;
   orderType: string;
+  stopLimit: number;
 
   constructor(private ibAPIService: IbAPIService) { }
 
@@ -46,12 +47,12 @@ export class HomeComponent implements OnInit {
   // the promise type should be a custom "High" type
   getHigh() {
     // AJAX connection to IB Rest API
-    // return this.ibAPIService.high()
-    //   .subscribe((result: any) => this.high = result[0][31]);
+    return this.ibAPIService.high()
+      .subscribe((result: any) => this.high = result[0][31]);
     
     // get mocked high value from random generator
     // the below return is automatically wrapped in a promise by JS
-    this.high = Math.random() * 10;
+    // this.high = Math.random() * 10;
   }
 
   initDay(config:Day):void {
@@ -80,12 +81,13 @@ export class HomeComponent implements OnInit {
       let counter:number = 0; 
 
       const interval = setInterval(async () => {
+        // documentation tells that setInterval() does not play nice with Promises/Observables
         if (counter < seconds) {
-          await this.getHigh();
+          this.getHigh();
 
           console.log('this->high', this.high);
-
           candle.push(this.high);
+
           counter++;
         } else {
           clearInterval(interval);
@@ -127,20 +129,28 @@ export class HomeComponent implements OnInit {
         this.isOrderPlaced = true;
   
         if (currCandleData.close > this.day.DAILY_HIGH) {
+          this.stopLimit = this.day.DAILY_LOW;
+          console.log('NEW STOP LIMIT: ', this.stopLimit);
           this.orderType = 'buy';
           this.marketOrder(this.high, 'buy', 'first');
         }
 
         if (currCandleData.close < this.day.DAILY_LOW) {
+          this.stopLimit = this.day.DAILY_HIGH;
+          console.log('NEW STOP LIMIT: ', this.stopLimit);
           this.orderType = 'sell';
           this.marketOrder(this.high, 'sell', 'first');
         }
       } else {
         if (this.high >= (this.orderPrice + this.day.DAILY_RANGE) && this.orderType === 'buy') {
+          this.stopLimit = this.day.DAILY_HIGH;
+          console.log('NEW STOP LIMIT: ', this.stopLimit);
           this.marketOrder(this.high, 'sell', 'recurrent');
         }
 
         if (this.high <= (this.orderPrice - this.day.DAILY_RANGE) && this.orderType === 'sell') {
+          this.stopLimit = this.day.DAILY_LOW;
+          console.log('NEW STOP LIMIT: ', this.stopLimit);
           this.marketOrder(this.high, 'buy', 'recurrent');
         }
       }
@@ -215,6 +225,7 @@ export class HomeComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.getHigh();
     // sets daily globals
     // starts operation of candle snapshots
     
