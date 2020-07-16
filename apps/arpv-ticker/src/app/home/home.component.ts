@@ -66,11 +66,11 @@ export class HomeComponent implements OnInit {
       DAILY_DATA_VECTOR: [[0]]
     };
 
-    if (config.DAILY_OPEN) this.day.DAILY_OPEN = config.DAILY_OPEN;
-    if (config.DAILY_LOW) this.day.DAILY_LOW = config.DAILY_LOW;
-    if (config.DAILY_HIGH) this.day.DAILY_HIGH = config.DAILY_HIGH;
-    if (config.DAILY_RANGE) this.day.DAILY_RANGE = config.DAILY_RANGE;
-    if (config.DAILY_DATA_VECTOR) this.day.DAILY_DATA_VECTOR = config.DAILY_DATA_VECTOR;
+    if(config.DAILY_OPEN) this.day.DAILY_OPEN = config.DAILY_OPEN;
+    if(config.DAILY_LOW) this.day.DAILY_LOW = config.DAILY_LOW;
+    if(config.DAILY_HIGH) this.day.DAILY_HIGH = config.DAILY_HIGH;
+    if(config.DAILY_RANGE) this.day.DAILY_RANGE = config.DAILY_RANGE;
+    if(config.DAILY_DATA_VECTOR) this.day.DAILY_DATA_VECTOR = config.DAILY_DATA_VECTOR;
   }
 
   // TODO: change number[] to Candle[] type
@@ -81,7 +81,7 @@ export class HomeComponent implements OnInit {
 
       const interval = setInterval(async () => {
         // documentation tells that setInterval() does not play nice with Promises/Observables
-        if (counter < seconds) {
+        if(counter < seconds) {
           this.getHigh();
 
           console.log('this->high', this.high);
@@ -124,59 +124,69 @@ export class HomeComponent implements OnInit {
 
       this.day.DAILY_DATA_VECTOR.push(currCandleData);
 
-      if (!this.isOrderPlaced) {
-        console.log('enters non placed order branch');
-  
-        if (currCandleData.close > this.day.DAILY_HIGH) {
+      if (!this.isOrderPlaced) /* first order branch*/ {
+        if(currCandleData.close > this.day.DAILY_HIGH) {
           this.isOrderPlaced = true;
           this.stopLimit = this.day.DAILY_LOW;
           console.log('NEW STOP LIMIT: ', this.stopLimit);
           this.orderType = 'buy';
-          this.marketOrder(this.high, 'buy', 'first');
+          this.marketOrder(this.high, 'buy', 'first', false);
         }
-
-        if (currCandleData.close < this.day.DAILY_LOW) {
+        if(currCandleData.close < this.day.DAILY_LOW) {
           this.isOrderPlaced = true;
           this.stopLimit = this.day.DAILY_HIGH;
           console.log('NEW STOP LIMIT: ', this.stopLimit);
           this.orderType = 'sell';
-          this.marketOrder(this.high, 'sell', 'first');
+          this.marketOrder(this.high, 'sell', 'first', false);
         }
-      } else {
-        console.log('enters placed order branch');
-
-        if (this.high >= (this.orderPrice + this.day.DAILY_RANGE) && this.orderType === 'buy') {
+      } else /* recurrent branch */{
+        if(this.orderType === 'buy') {
           this.isOrderPlaced = true;
-          this.stopLimit = this.day.DAILY_HIGH;
-          console.log('NEW STOP LIMIT: ', this.stopLimit);
-          this.marketOrder(this.high, 'sell', 'recurrent');
-        }
-
-        if (this.high <= (this.orderPrice - this.day.DAILY_RANGE) && this.orderType === 'sell') {
+          if(this.high <= this.stopLimit) {
+            // sell everything you bought
+            this.marketOrder(this.high, 'sell', 'recurrent', true);
+            console.log('Reached lowest price, SELL EVERYTHING!');
+          }
+          if(this.high >= (this.orderPrice + this.day.DAILY_RANGE)) {
+            this.stopLimit = this.day.DAILY_HIGH;
+            this.marketOrder(this.high, 'sell', 'recurrent', false);
+            this.orderPrice = this.high;
+          }
+        } else if (this.orderType === 'sell') {
           this.isOrderPlaced = true;
-          this.stopLimit = this.day.DAILY_LOW;
-          console.log('NEW STOP LIMIT: ', this.stopLimit);
-          this.marketOrder(this.high, 'buy', 'recurrent');
+          if(this.high >= this.stopLimit) {
+            this.marketOrder(this.high, 'buy', 'recurrent', true);
+            console.log('Reached highest price, BUY EVERYTHING!')
+          }
+          if(this.high <= (this.orderPrice - this.day.DAILY_RANGE)) {
+            this.stopLimit = this.day.DAILY_LOW;
+            this.marketOrder(this.high, 'buy', 'recurrent', false);
+            this.orderPrice = this.high;
+          }
         }
-      }
+      } // close recurrent branch
     }
   }
 
-  marketOrder(high:number, type: string, message: string) {
+  marketOrder(high:number, type: string, message: string, liquidate: boolean) {
     console.log('executed order!!!');
-    if (type === 'buy') {
-      if (message === 'first') {
+    if(type === 'buy') {
+      if(message === 'first') {
         this.orderPrice = high;
         console.log('Order Price: ', this.orderPrice);
         // execute buy order through API
         console.log("%c%s", "background:green; font-size: 30px; color: black; padding: 3px 12px;", `${message} ${type}`);
       } 
-      
-      if (message === 'recurrent') {
-        console.log('Order Price: ', this.orderPrice);
-        if (this.orderContracts > 0) {
-          this.orderContracts = this.orderContracts * 0.75;
-          console.log('Contracts left: ', this.orderContracts);
+      if(message === 'recurrent') {
+        if(this.orderContracts > 0) {
+          if(liquidate) {
+            this.orderContracts = 0;
+            // market order to liquidate
+          } else {
+            this.orderContracts = this.orderContracts - 3;
+            // market order to buy portion
+            console.log('Contracts left: ', this.orderContracts);
+          }
         } else {
           console.log('POSITION CLOSED!');
           return false;
@@ -186,17 +196,17 @@ export class HomeComponent implements OnInit {
       } 
     }
 
-    if (type === 'sell') {
-      if (message === 'first') {
+    if(type === 'sell') {
+      if(message === 'first') {
         this.orderPrice = high;
         console.log('Order Price: ', this.orderPrice);
         // execute sell order through API
         console.log("%c%s", "background:green; font-size: 30px; color: black; padding: 3px 12px;", `${message} ${type}`);
       } 
       
-      if (message === 'recurrent') {
-        if (this.orderContracts > 0) {
-          this.orderContracts = this.orderContracts * 0.75;
+      if(message === 'recurrent') {
+        if(this.orderContracts > 0) {
+          this.orderContracts = this.orderContracts - 3;
           console.log('Contracts left: ', this.orderContracts);
         } else {
           console.log('POSITION CLOSED!');
