@@ -29,7 +29,7 @@ interface Day {
 })
 export class HomeComponent implements OnInit {
   // time unit is a second (1000 miliseconds)
-  readonly TIME_UNIT:number = 1000;
+  readonly TIME_UNIT:number = 3000;
   readonly TIME_INTERVAL = 5;
   price: number;
   day: Day;
@@ -40,6 +40,7 @@ export class HomeComponent implements OnInit {
   orderPrice: number;
   orderType: string;
   stopLimit: number;
+  orderContracts: number = 12;
 
   constructor(private ibAPIService: IbAPIService) { }
 
@@ -70,8 +71,6 @@ export class HomeComponent implements OnInit {
     if (config.DAILY_HIGH) this.day.DAILY_HIGH = config.DAILY_HIGH;
     if (config.DAILY_RANGE) this.day.DAILY_RANGE = config.DAILY_RANGE;
     if (config.DAILY_DATA_VECTOR) this.day.DAILY_DATA_VECTOR = config.DAILY_DATA_VECTOR;
-
-    // return newDay;
   }
 
   // TODO: change number[] to Candle[] type
@@ -126,9 +125,10 @@ export class HomeComponent implements OnInit {
       this.day.DAILY_DATA_VECTOR.push(currCandleData);
 
       if (!this.isOrderPlaced) {
-        this.isOrderPlaced = true;
+        console.log('enters non placed order branch');
   
         if (currCandleData.close > this.day.DAILY_HIGH) {
+          this.isOrderPlaced = true;
           this.stopLimit = this.day.DAILY_LOW;
           console.log('NEW STOP LIMIT: ', this.stopLimit);
           this.orderType = 'buy';
@@ -136,19 +136,24 @@ export class HomeComponent implements OnInit {
         }
 
         if (currCandleData.close < this.day.DAILY_LOW) {
+          this.isOrderPlaced = true;
           this.stopLimit = this.day.DAILY_HIGH;
           console.log('NEW STOP LIMIT: ', this.stopLimit);
           this.orderType = 'sell';
           this.marketOrder(this.high, 'sell', 'first');
         }
       } else {
+        console.log('enters placed order branch');
+
         if (this.high >= (this.orderPrice + this.day.DAILY_RANGE) && this.orderType === 'buy') {
+          this.isOrderPlaced = true;
           this.stopLimit = this.day.DAILY_HIGH;
           console.log('NEW STOP LIMIT: ', this.stopLimit);
           this.marketOrder(this.high, 'sell', 'recurrent');
         }
 
         if (this.high <= (this.orderPrice - this.day.DAILY_RANGE) && this.orderType === 'sell') {
+          this.isOrderPlaced = true;
           this.stopLimit = this.day.DAILY_LOW;
           console.log('NEW STOP LIMIT: ', this.stopLimit);
           this.marketOrder(this.high, 'buy', 'recurrent');
@@ -158,14 +163,24 @@ export class HomeComponent implements OnInit {
   }
 
   marketOrder(high:number, type: string, message: string) {
+    console.log('executed order!!!');
     if (type === 'buy') {
       if (message === 'first') {
         this.orderPrice = high;
+        console.log('Order Price: ', this.orderPrice);
         // execute buy order through API
         console.log("%c%s", "background:green; font-size: 30px; color: black; padding: 3px 12px;", `${message} ${type}`);
       } 
       
       if (message === 'recurrent') {
+        console.log('Order Price: ', this.orderPrice);
+        if (this.orderContracts > 0) {
+          this.orderContracts = this.orderContracts * 0.75;
+          console.log('Contracts left: ', this.orderContracts);
+        } else {
+          console.log('POSITION CLOSED!');
+          return false;
+        }
         // execute buy order through API
         console.log("%c%s", "background:green; font-size: 30px; color: black; padding: 3px 12px;", `${message} ${type}`);
       } 
@@ -174,11 +189,19 @@ export class HomeComponent implements OnInit {
     if (type === 'sell') {
       if (message === 'first') {
         this.orderPrice = high;
+        console.log('Order Price: ', this.orderPrice);
         // execute sell order through API
         console.log("%c%s", "background:green; font-size: 30px; color: black; padding: 3px 12px;", `${message} ${type}`);
       } 
       
       if (message === 'recurrent') {
+        if (this.orderContracts > 0) {
+          this.orderContracts = this.orderContracts * 0.75;
+          console.log('Contracts left: ', this.orderContracts);
+        } else {
+          console.log('POSITION CLOSED!');
+          return false;
+        }
         // execute sell order through API
         console.log("%c%s", "background:green; font-size: 30px; color: black; padding: 3px 12px;", `${message} ${type}`);
       } 
@@ -188,8 +211,9 @@ export class HomeComponent implements OnInit {
   async start() {
     console.log('...starting...');
     await this.setDayGlobals().catch(error => console.log(error.stack));
+
     this.run();
-    console.log('...running...');
+    // console.log('...running...');
   }
   
   stop() {
