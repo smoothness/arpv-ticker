@@ -1,25 +1,7 @@
-import { Component, OnInit, COMPILER_OPTIONS } from '@angular/core';
-import * as R from "ramda";
+import { Component, OnInit, ViewChild, ElementRef } from '@angular/core';
+import * as R from 'ramda';
 
-// modify this route / look at WR project
-import { IbAPIService } from '../../../../../libs/core-data/src/lib/IbAPI/ib-api.service';
-
-// interface Candle {
-//   open: number;
-//   low: number;
-//   high: number;
-//   close: number;
-//   data: number[];
-// }
-
-interface Day {
-  DAILY_OPEN: number;
-  DAILY_LOW: number;
-  DAILY_HIGH: number;
-  DAILY_CLOSE?: number;
-  DAILY_RANGE: number;
-  DAILY_DATA_VECTOR?: any;
-}
+import { MarketDataService, IbAPIService, Day, Candle } from '@arpv/core-data';
 
 @Component({
   // tslint:disable-next-line: component-selector
@@ -28,9 +10,11 @@ interface Day {
   styleUrls: ['./home.component.css']
 })
 export class HomeComponent implements OnInit {
+  @ViewChild('candleContainer', {read: ElementRef}) candleContainer: ElementRef;
+
   // time unit is a second (1000 miliseconds)
   readonly TIME_UNIT:number = 3000;
-  readonly TIME_INTERVAL = 5;
+  TIME_INTERVAL = 5;
   price: number;
   day: Day;
   running: boolean = true;
@@ -41,8 +25,24 @@ export class HomeComponent implements OnInit {
   orderType: string;
   stopLimit: number;
   orderContracts: number = 12;
+  liquidateState: boolean = false;
 
-  constructor(private ibAPIService: IbAPIService) { }
+  constructor(
+    private mds: MarketDataService,
+    private ibAPIService: IbAPIService
+  ) { }
+
+  // UI state
+  UIservice(type: string) {
+    console.log('calls UI service with type: ', type);
+    if(type === 'buy') {
+      this.candleContainer.nativeElement.classList.add('buy');
+    }
+    if(type === 'buy') {
+      this.candleContainer.nativeElement.classList.add('sell');
+    }
+    // console.log(this.candleContainer.nativeElement.textContent);
+  }
 
   // get teh high value of teh data feed
   // the promise type should be a custom "High" type
@@ -100,88 +100,119 @@ export class HomeComponent implements OnInit {
   // sets daily open, low and high from high
   // appends first candle into daily vector
   async setDayGlobals():Promise<void> {
-    const first_candle = await this.getSnapshot(this.TIME_INTERVAL);
+    const first_candle = await this.getSnapshot(5);
     this.initDay({
-      DAILY_OPEN: this.calcOpen(first_candle),
-      DAILY_LOW: this.calcLow(first_candle),
-      DAILY_HIGH: this.calcHigh(first_candle),
-      DAILY_RANGE: this.calcRange(this.calcHigh(first_candle), this.calcLow(first_candle)),
+      DAILY_OPEN: this.mds.calcOpen(first_candle),
+      DAILY_LOW: this.mds.calcLow(first_candle),
+      DAILY_HIGH: this.mds.calcHigh(first_candle),
+      DAILY_RANGE: this.mds.calcRange(this.mds.calcHigh(first_candle), this.mds.calcLow(first_candle)),
       DAILY_DATA_VECTOR: [first_candle]
     });
   }
   
   async run() {
     while (this.running) {
-      const snapshot = await this.getSnapshot(this.TIME_INTERVAL);
+      const snapshot = await this.getSnapshot(1);
       this.lastSnapshot = snapshot;
       const currCandleData = {
-        open: this.calcOpen(snapshot),
-        low: this.calcLow(snapshot),
-        high: this.calcHigh(snapshot),
-        close: this.calcClose(snapshot), 
+        open: this.mds.calcOpen(snapshot),
+        low: this.mds.calcLow(snapshot),
+        high: this.mds.calcHigh(snapshot),
+        close: this.mds.calcClose(snapshot), 
         data: [snapshot]
       }
 
       this.day.DAILY_DATA_VECTOR.push(currCandleData);
 
-      if (!this.isOrderPlaced) /* first order branch*/ {
-        if(currCandleData.close > this.day.DAILY_HIGH) {
-          this.isOrderPlaced = true;
-          this.stopLimit = this.day.DAILY_LOW;
-          console.log('NEW STOP LIMIT: ', this.stopLimit);
-          this.orderType = 'buy';
-          this.marketOrder(this.high, 'buy', 'first', false);
-        }
-        if(currCandleData.close < this.day.DAILY_LOW) {
-          this.isOrderPlaced = true;
-          this.stopLimit = this.day.DAILY_HIGH;
-          console.log('NEW STOP LIMIT: ', this.stopLimit);
-          this.orderType = 'sell';
-          this.marketOrder(this.high, 'sell', 'first', false);
-        }
-      } else /* recurrent branch */{
-        if(this.orderType === 'buy') {
-          this.isOrderPlaced = true;
-          if(this.high <= this.stopLimit) {
-            // sell everything you bought
-            this.marketOrder(this.high, 'sell', 'recurrent', true);
-            console.log('Reached lowest price, SELL EVERYTHING!');
-          }
-          if(this.high >= (this.orderPrice + this.day.DAILY_RANGE)) {
-            this.stopLimit = this.day.DAILY_HIGH;
-            this.marketOrder(this.high, 'sell', 'recurrent', false);
-            this.orderPrice = this.high;
-          }
-        } else if (this.orderType === 'sell') {
-          this.isOrderPlaced = true;
-          if(this.high >= this.stopLimit) {
-            this.marketOrder(this.high, 'buy', 'recurrent', true);
-            console.log('Reached highest price, BUY EVERYTHING!')
-          }
-          if(this.high <= (this.orderPrice - this.day.DAILY_RANGE)) {
-            this.stopLimit = this.day.DAILY_LOW;
-            this.marketOrder(this.high, 'buy', 'recurrent', false);
-            this.orderPrice = this.high;
-          }
-        }
-      } // close recurrent branch
+      // first sell condition
+      if(!this.isOrderPlaced) {
+        this.firstPipe(currCandleData);
+      } else {
+        this.recurrentPipe(currCandleData);
+      }
     }
   }
 
-  marketOrder(high:number, type: string, message: string, liquidate: boolean) {
-    console.log('executed order!!!');
+  firstPipe(candle: Candle) {
+    if(candle.close > this.day.DAILY_HIGH) {
+      this.createFirstOrder(candle.high, 'buy');
+    }
+    if(candle.close < this.day.DAILY_LOW) {
+      this.createFirstOrder(candle.high, 'sell');
+    }
+  }
+
+  recurrentPipe(candle: Candle) {
+    if(this.orderType === 'buy') {
+      this.recurrentBuyPipe(candle.high);
+    } else if(this.orderType === 'sell') {
+      this.recurrentSellPipe(candle.high);
+    } else console.log('%c%s', 'background:green; font-size: 30px; color: black; padding: 3px 12px;','Into recurrent order creation but not order type defined!');
+  }
+
+  recurrentBuyPipe(price: number) {
+    if(price <= this.stopLimit) {
+      console.log('Reached lowest price, SELL EVERYTHING!');
+      this.liquidateState = true;
+      this.createRecurrentOrder(price, 'sell')
+      this.running = false;
+      return false;
+    }
+    if(price >= (this.orderPrice + this.day.DAILY_RANGE)) {
+      this.stopLimit = this.day.DAILY_HIGH;
+      this.orderPrice = price;
+      this.createRecurrentOrder(price, 'sell')
+    } 
+  }
+
+  recurrentSellPipe(price: number) {
+    if(price >= this.stopLimit) {
+      console.log('Reached highest price, BUY EVERYTHING!')
+      this.liquidateState = true;
+      this.createRecurrentOrder(price, 'buy')
+      this.running = false;
+      return false;
+    }
+    if(price <= (this.orderPrice - this.day.DAILY_RANGE)) {
+      this.stopLimit = this.day.DAILY_LOW;
+      this.orderPrice = price;
+      this.createRecurrentOrder(price, 'buy')
+    } 
+  }
+
+  createFirstOrder(price: number, type: string) {
+    this.isOrderPlaced = true;
+    if(type === 'buy') {
+      this.stopLimit = this.day.DAILY_LOW;
+      this.orderType = 'buy';
+    } else if(type === 'sell') {
+      this.stopLimit = this.day.DAILY_HIGH;
+      this.orderType = 'sell';
+    } else console.log("%c%s", "background: red; font-size: 30px; color: black; padding: 3px 12px;", `NO TYPE SET?!?!?!?!`);
+    this.createMarketOrder(price, type, 'first', false);
+  }
+
+  createRecurrentOrder(price: number, type: string) {
+    this.createMarketOrder(price, type, 'recurrent', this.liquidateState); 
+  }
+
+  // actually creates an order here
+  createMarketOrder(price: number, type: string, message: string, liquidate: boolean) {
+    console.log('execute order.');
     if(type === 'buy') {
       if(message === 'first') {
-        this.orderPrice = high;
+        console.log("%c%s", "background:green; font-size: 30px; color: black; padding: 3px 12px;", `${message} ${type}, Price: ${this.orderPrice}`);
+        this.orderPrice = price;
+        // this.UIservice(type);
         console.log('Order Price: ', this.orderPrice);
-        // execute buy order through API
-        console.log("%c%s", "background:green; font-size: 30px; color: black; padding: 3px 12px;", `${message} ${type}`);
+        console.log('Range: ', this.day.DAILY_RANGE);
       } 
       if(message === 'recurrent') {
+        console.log("%c%s", "background:green; font-size: 30px; color: black; padding: 3px 12px;", `${message} ${type}, Price: ${this.orderPrice}`);
         if(this.orderContracts > 0) {
           if(liquidate) {
             this.orderContracts = 0;
-            // market order to liquidate
+            // market order  liquidate
           } else {
             this.orderContracts = this.orderContracts - 3;
             // market order to buy portion
@@ -191,20 +222,16 @@ export class HomeComponent implements OnInit {
           console.log('POSITION CLOSED!');
           return false;
         }
-        // execute buy order through API
-        console.log("%c%s", "background:green; font-size: 30px; color: black; padding: 3px 12px;", `${message} ${type}`);
       } 
-    }
-
-    if(type === 'sell') {
+    } else if (type === 'sell') {
       if(message === 'first') {
-        this.orderPrice = high;
+        this.orderPrice = price;
+        console.log("%c%s", "background:green; font-size: 30px; color: black; padding: 3px 12px;", `${message} ${type}, Price: ${this.orderPrice}`);
+        // this.UIservice(type);
         console.log('Order Price: ', this.orderPrice);
-        // execute sell order through API
-        console.log("%c%s", "background:green; font-size: 30px; color: black; padding: 3px 12px;", `${message} ${type}`);
-      } 
-      
-      if(message === 'recurrent') {
+        console.log('Range: ', this.day.DAILY_RANGE);
+      } else if (message === 'recurrent') {
+        console.log("%c%s", "background:green; font-size: 30px; color: black; padding: 3px 12px;", `${message} ${type}, Price: ${this.orderPrice}`);console.log("%c%s", "background:green; font-size: 30px; color: black; padding: 3px 12px;", `${message} ${type}, Price: ${this.orderPrice}`);
         if(this.orderContracts > 0) {
           this.orderContracts = this.orderContracts - 3;
           console.log('Contracts left: ', this.orderContracts);
@@ -212,18 +239,16 @@ export class HomeComponent implements OnInit {
           console.log('POSITION CLOSED!');
           return false;
         }
-        // execute sell order through API
-        console.log("%c%s", "background:green; font-size: 30px; color: black; padding: 3px 12px;", `${message} ${type}`);
       } 
-    }
+    } else console.log("%c%s", "background: red; font-size: 30px; color: black; padding: 3px 12px;", `NO TYPE SET?!?!?!?!`);
   }
 
   async start() {
-    console.log('...starting...');
+    console.log('/********* Starting *********/');
     await this.setDayGlobals().catch(error => console.log(error.stack));
 
     this.run();
-    // console.log('...running...');
+    console.log('/********* Running *********/');
   }
   
   stop() {
@@ -236,30 +261,9 @@ export class HomeComponent implements OnInit {
     console.log('Day close: ', this.day.DAILY_CLOSE);
   }
 
-  calcOpen(list: number[]): number {
-    return R.head(list);
-  }
-
-  calcClose(list: number[]): number {
-    return R.last(list);
-  }
-
-  calcLow(list: number[]): number {
-    return R.head(R.sort((a: number, b:number) => a - b, list));
-    // return list.sort()[0];
-  }
- 
-  calcHigh(list: number[]): number {
-    return R.last(R.sort((a: number, b:number) => a - b, list));
-    // return list.sort()[list.length - 1];
-  }
-
-  calcRange(high: number, low: number): number {
-    return high - low; 
-  }
-
   ngOnInit(): void {
     this.getHigh();
+  //   console.log(this.candleContainer.nativeElement.textContent);
     // sets daily globals
     // starts operation of candle snapshots
     
@@ -269,5 +273,10 @@ export class HomeComponent implements OnInit {
     // implement insertInDB
     // insertInDB()
   }
+
+  // ngAfterViewInit(): void {
+  //   this.getHigh();
+  //   console.log(this.candleContainer.nativeElement.textContent);
+  // }
 
 }
