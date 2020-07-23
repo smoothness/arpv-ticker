@@ -233,7 +233,7 @@ export class HomeComponent implements OnInit {
         console.log('Order Price: ', this.orderPrice);
         console.log('Range: ', this.day.DAILY_RANGE);
       } else if (message === 'recurrent') {
-        console.log("%c%s", "background:green; font-size: 30px; color: black; padding: 3px 12px;", `${message} ${type}, Price: ${this.orderPrice}`);console.log("%c%s", "background:green; font-size: 30px; color: black; padding: 3px 12px;", `${message} ${type}, Price: ${this.orderPrice}`);
+        console.log("%c%s", "background:green; font-size: 30px; color: black; padding: 3px 12px;", `${message} ${type}, Price: ${this.orderPrice}`);
         if(this.orderContracts > 0) {
           this.orderContracts = this.orderContracts - 3;
           console.log('Contracts left: ', this.orderContracts);
