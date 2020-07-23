@@ -158,7 +158,12 @@ export class HomeComponent implements OnInit {
       this.running = false;
       return false;
     }
+    console.log('current candle price 1 = ', price);
+    console.log('order price + range 1 = ', this.orderPrice + this.day.DAILY_RANGE);
     if(price >= (this.orderPrice + this.day.DAILY_RANGE)) {
+      console.log('current candle price 2 = ', price);
+      console.log('order price + range 2 = ', this.orderPrice + this.day.DAILY_RANGE);
+
       this.stopLimit = this.day.DAILY_HIGH;
       this.orderPrice = price;
       this.createRecurrentOrder(price, this.orderType)
