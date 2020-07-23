@@ -201,8 +201,8 @@ export class HomeComponent implements OnInit {
     console.log('execute order.');
     if(type === 'buy') {
       if(message === 'first') {
-        console.log("%c%s", "background:green; font-size: 30px; color: black; padding: 3px 12px;", `${message} ${type}, Price: ${this.orderPrice}`);
         this.orderPrice = price;
+        console.log("%c%s", "background:green; font-size: 30px; color: black; padding: 3px 12px;", `${message} ${type}, Price: ${this.orderPrice}`);
         // this.UIservice(type);
         console.log('Order Price: ', this.orderPrice);
         console.log('Range: ', this.day.DAILY_RANGE);
