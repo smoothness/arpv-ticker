@@ -151,23 +151,21 @@ export class HomeComponent implements OnInit {
   }
 
   recurrentBuyPipe(price: number) {
-    console.log('into recurrent  buy...')
     if(price <= this.stopLimit) {
       console.log('Reached lowest price, SELL EVERYTHING!');
       this.liquidateState = true;
-      this.createRecurrentOrder(price, 'sell')
+      this.createRecurrentOrder(price, this.orderType)
       this.running = false;
       return false;
     }
     if(price >= (this.orderPrice + this.day.DAILY_RANGE)) {
       this.stopLimit = this.day.DAILY_HIGH;
       this.orderPrice = price;
-      this.createRecurrentOrder(price, 'sell')
+      this.createRecurrentOrder(price, this.orderType)
     } 
   }
 
   recurrentSellPipe(price: number) {
-    console.log('into recurrent  sell...')
     if(price >= this.stopLimit) {
       console.log('Reached highest price, BUY EVERYTHING!')
       this.liquidateState = true;
