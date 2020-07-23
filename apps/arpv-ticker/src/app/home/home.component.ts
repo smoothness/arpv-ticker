@@ -151,6 +151,7 @@ export class HomeComponent implements OnInit {
   }
 
   recurrentBuyPipe(price: number) {
+    console.log('into recurrent  buy...')
     if(price <= this.stopLimit) {
       console.log('Reached lowest price, SELL EVERYTHING!');
       this.liquidateState = true;
@@ -166,17 +167,18 @@ export class HomeComponent implements OnInit {
   }
 
   recurrentSellPipe(price: number) {
+    console.log('into recurrent  sell...')
     if(price >= this.stopLimit) {
       console.log('Reached highest price, BUY EVERYTHING!')
       this.liquidateState = true;
-      this.createRecurrentOrder(price, 'buy')
+      this.createRecurrentOrder(price, this.orderType);
       this.running = false;
       return false;
     }
     if(price <= (this.orderPrice - this.day.DAILY_RANGE)) {
       this.stopLimit = this.day.DAILY_LOW;
       this.orderPrice = price;
-      this.createRecurrentOrder(price, 'buy')
+      this.createRecurrentOrder(price, this.orderType);
     } 
   }
 
@@ -189,7 +191,7 @@ export class HomeComponent implements OnInit {
       this.stopLimit = this.day.DAILY_HIGH;
       this.orderType = 'sell';
     } else console.log("%c%s", "background: red; font-size: 30px; color: black; padding: 3px 12px;", `NO TYPE SET?!?!?!?!`);
-    this.createMarketOrder(price, type, 'first', false);
+    this.createMarketOrder(price, this.orderType, 'first', false);
   }
 
   createRecurrentOrder(price: number, type: string) {
