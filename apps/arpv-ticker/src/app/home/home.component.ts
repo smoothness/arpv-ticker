@@ -49,7 +49,7 @@ export class HomeComponent implements OnInit {
   getHigh() {
     // AJAX connection to IB Rest API
     return this.ibAPIService.high()
-      .subscribe((result: any) => this.high = result[0][31]);
+      .subscribe((result: number) => this.high = Number(result[0][31]));
     
     // get mocked high value from random generator
     // the below return is automatically wrapped in a promise by JS
@@ -158,16 +158,11 @@ export class HomeComponent implements OnInit {
       this.running = false;
       return false;
     }
-    console.log('current candle price 1 = ', price);
-    console.log('order price + range 1 = ', this.orderPrice + this.day.DAILY_RANGE);
     if(price >= (this.orderPrice + this.day.DAILY_RANGE)) {
-      console.log('current candle price 2 = ', price);
-      console.log('order price + range 2 = ', this.orderPrice + this.day.DAILY_RANGE);
-
       this.stopLimit = this.day.DAILY_HIGH;
       this.orderPrice = price;
       this.createRecurrentOrder(price, this.orderType)
-    } 
+    }
   }
 
   recurrentSellPipe(price: number) {
