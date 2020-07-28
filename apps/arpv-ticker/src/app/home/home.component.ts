@@ -112,7 +112,7 @@ export class HomeComponent implements OnInit {
   
   async run() {
     while (this.running) {
-      const snapshot = await this.getSnapshot(1);
+      const snapshot = await this.getSnapshot(5);
       this.lastSnapshot = snapshot;
       const currCandleData = {
         open: this.mds.calcOpen(snapshot),
@@ -128,6 +128,7 @@ export class HomeComponent implements OnInit {
       if(!this.isOrderPlaced) {
         this.firstPipe(currCandleData);
       } else {
+        if (this.liquidateState) break;
         this.recurrentPipe(currCandleData);
       }
     }
@@ -193,7 +194,7 @@ export class HomeComponent implements OnInit {
   }
 
   createRecurrentOrder(price: number, type: string) {
-    this.createMarketOrder(price, type, 'recurrent', this.liquidateState); 
+    this.createMarketOrder(price, type, 'recurrent', this.liquidateState);
   }
 
   // actually creates an order here
