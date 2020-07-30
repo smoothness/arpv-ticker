@@ -14,7 +14,7 @@ export class HomeComponent implements OnInit {
 
   // time unit is a second (1000 miliseconds)
   readonly TIME_UNIT:number = 3000;
-  TIME_INTERVAL = 5;
+  // TIME_INTERVAL = 5;
   price: number;
   day: Day;
   running: boolean = true;
@@ -48,12 +48,12 @@ export class HomeComponent implements OnInit {
   // the promise type should be a custom "High" type
   getHigh() {
     // AJAX connection to IB Rest API
-    return this.ibAPIService.high()
-      .subscribe((result: number) => this.high = Number(result[0][31]));
+    // return this.ibAPIService.high()
+    //   .subscribe((result: number) => this.high = Number(result[0][31]));
     
     // get mocked high value from random generator
     // the below return is automatically wrapped in a promise by JS
-    // this.high = Math.random() * 10;
+    this.high = Math.random() * 10;
   }
 
   initDay(config:Day):void {
@@ -83,8 +83,13 @@ export class HomeComponent implements OnInit {
         // documentation tells that setInterval() does not play nice with Promises/Observables
         if(counter < seconds) {
           this.getHigh();
-
           console.log('this->high', this.high);
+          
+          // recurrents neet to have the single price each tick
+          if (this.isOrderPlaced && !this.liquidateState) {
+            this.recurrentPipe(this.high);
+          }
+
           candle.push(this.high);
 
           counter++;
@@ -100,7 +105,9 @@ export class HomeComponent implements OnInit {
   // sets daily open, low and high from high
   // appends first candle into daily vector
   async setDayGlobals():Promise<void> {
-    const first_candle = await this.getSnapshot(5);
+    // tslint:disable-next-line: prefer-const
+    let first_candle = await this.getSnapshot(5);
+    console.log('waiting...')
     this.initDay({
       DAILY_OPEN: this.mds.calcOpen(first_candle),
       DAILY_LOW: this.mds.calcLow(first_candle),
@@ -112,7 +119,9 @@ export class HomeComponent implements OnInit {
   
   async run() {
     while (this.running) {
-      const snapshot = await this.getSnapshot(5);
+      // tslint:disable-next-line: prefer-const
+      let snapshot = await this.getSnapshot(5);
+      console.log('waiting................');
       this.lastSnapshot = snapshot;
       const currCandleData = {
         open: this.mds.calcOpen(snapshot),
@@ -124,30 +133,35 @@ export class HomeComponent implements OnInit {
 
       this.day.DAILY_DATA_VECTOR.push(currCandleData);
 
-      // first sell condition
+      // first sell / buy condition
+      /* needs to be evaluated each price or each candle? */
       if(!this.isOrderPlaced) {
         this.firstPipe(currCandleData);
-      } else {
-        if (this.liquidateState) break;
-        this.recurrentPipe(currCandleData);
-      }
+      } 
+      // else {
+      //   if (this.liquidateState) break;
+      //   this.recurrentPipe(currCandleData);
+      // }
     }
   }
+
+  comparePrice() {}
 
   firstPipe(candle: Candle) {
     if(candle.close > this.day.DAILY_HIGH) {
-      this.createFirstOrder(candle.high, 'buy');
+      this.createFirstOrder(this.high, 'buy');
     }
     if(candle.close < this.day.DAILY_LOW) {
-      this.createFirstOrder(candle.high, 'sell');
+      this.createFirstOrder(this.high, 'sell');
     }
   }
 
-  recurrentPipe(candle: Candle) {
+  // recurrents does not need the candle, just each price
+  recurrentPipe(price: number) {
     if(this.orderType === 'buy') {
-      this.recurrentBuyPipe(candle.high);
+      this.recurrentBuyPipe(price);
     } else if(this.orderType === 'sell') {
-      this.recurrentSellPipe(candle.high);
+      this.recurrentSellPipe(price);
     } else console.log('%c%s', 'background:green; font-size: 30px; color: black; padding: 3px 12px;','Into recurrent order creation but not order type defined!');
   }
 
