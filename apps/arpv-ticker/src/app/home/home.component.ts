@@ -26,6 +26,7 @@ export class HomeComponent implements OnInit {
   stopLimit: number;
   orderContracts: number = 12;
   liquidateState: boolean = false;
+  resultFromOrder: any;
 
   constructor(
     private mds: MarketDataService,
@@ -48,12 +49,12 @@ export class HomeComponent implements OnInit {
   // the promise type should be a custom "High" type
   getHigh() {
     // AJAX connection to IB Rest API
-    // return this.ibAPIService.high()
-    //   .subscribe((result: number) => this.high = Number(result[0][31]));
+    return this.ibAPIService.high()
+      .subscribe((result: number) => this.high = Number(result[0][31]));
     
     // get mocked high value from random generator
     // the below return is automatically wrapped in a promise by JS
-    this.high = Math.random() * 10;
+    // this.high = Math.random() * 10;
   }
 
   initDay(config:Day):void {
@@ -274,6 +275,11 @@ export class HomeComponent implements OnInit {
     // (or the cronjob triggers the day close)
     this.day.DAILY_CLOSE = R.last(this.lastSnapshot);
     console.log('Day close: ', this.day.DAILY_CLOSE);
+  }
+
+  createOrder() {
+    return this.ibAPIService.createOrder()
+      .subscribe((result: any) => this.resultFromOrder = result);
   }
 
   ngOnInit(): void {

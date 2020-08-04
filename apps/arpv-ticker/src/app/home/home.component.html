@@ -2,6 +2,13 @@
 <div>
   <button (click)="start()">Start</button>
   <button (click)="stop()">Stop</button>
+  <button (click)="createOrder()" class="btn_order">Order</button> 
+  <div>
+    <h3>Result from order:</h3>
+    <pre>
+      {{ resultFromOrder | json }}
+    </pre>
+  </div>
 </div>
 <section class="stats">
   <h2>Stats:</h2>

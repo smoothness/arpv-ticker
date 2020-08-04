@@ -20,3 +20,7 @@ h1, h2, h3 {
 .sell {
   background-color: orangered;
 }
+
+.btn_order {
+  background-color: yellow;
+}
